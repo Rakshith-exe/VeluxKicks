@@ -75,7 +75,7 @@ export default function Login({ onPageChange }) {
           if (data.message === "User not found") {
             setError("Account not found, please sign up");
           } else {
-            setError(data.message || "Login failed");
+            setError(data.message || "Login failed. Please check if the server and database are running.");
           }
         }
       } else {
@@ -124,7 +124,7 @@ export default function Login({ onPageChange }) {
             window.location.reload();
           }
         } else {
-          setError(data.message || "Registration failed");
+          setError(data.message || "Registration failed. Please check if the server and database are running.");
         }
       }
     } catch (err) {
