@@ -34,6 +34,10 @@ export default function Login({ onPageChange }) {
     setError("");
     setLoading(true);
 
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
     try {
       if (isLogin) {
         // Login
@@ -44,7 +48,9 @@ export default function Login({ onPageChange }) {
             email: formData.email,
             password: formData.password,
           }),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         const data = await response.json();
         if (data.success) {
@@ -94,6 +100,7 @@ export default function Login({ onPageChange }) {
             zipCode: formData.zipCode,
             country: formData.country,
           }),
+          signal: controller.signal
         });
 
         const data = await response.json();
@@ -121,7 +128,12 @@ export default function Login({ onPageChange }) {
         }
       }
     } catch (err) {
-      setError("Network error. Please check if the server is running.");
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        setError("Server is taking too long to respond. Please try again later.");
+      } else {
+        setError("Network error. Please check if the server is running.");
+      }
       console.error("Error:", err);
     } finally {
       setLoading(false);
