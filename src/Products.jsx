@@ -1,0 +1,221 @@
+import React, { useState, useEffect } from "react";
+import { productsData } from "./productsData";
+import { Heart } from "lucide-react";
+import API_BASE_URL from "./config";
+
+export default function Products({ onAddToCart, onPageChange }) {
+  const [displayed, setDisplayed] = useState(12);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [wishlist, setWishlist] = useState([]);
+
+  useEffect(() => {
+    fetchProducts();
+    fetchWishlist();
+  }, []);
+
+  const fetchProducts = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/products`);
+      const data = await response.json();
+      if (data.success && data.data && data.data.length > 0) {
+        setProducts(data.data);
+      } else {
+        // Fallback to static data if API returns empty or no products
+        setProducts(productsData);
+      }
+    } catch (err) {
+      console.error("Error fetching products:", err);
+      // Fallback to static data if API fails
+      setProducts(productsData);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchWishlist = async () => {
+    const user = JSON.parse(localStorage.getItem("user"));
+    if (!user) return;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/wishlist/${user.id}`);
+      const data = await response.json();
+      if (data.success) {
+        const wishlistIds = data.data.map(item => item._id);
+        setWishlist(wishlistIds);
+      }
+    } catch (err) {
+      console.error("Error fetching wishlist:", err);
+    }
+  };
+
+  const handleToggleWishlist = async (product, e) => {
+    e.stopPropagation();
+    const user = JSON.parse(localStorage.getItem("user"));
+
+    if (!user) {
+      alert("Please login to add items to wishlist");
+      onPageChange("Login");
+      return;
+    }
+
+    const isInWishlist = wishlist.includes(product._id);
+
+    try {
+      if (isInWishlist) {
+        const response = await fetch(`${API_BASE_URL}/wishlist/${user.id}/${product._id}`, {
+          method: "DELETE",
+        });
+        const data = await response.json();
+        if (data.success) {
+          setWishlist(data.data || []);
+        }
+      } else {
+        const response = await fetch(`${API_BASE_URL}/wishlist/${user.id}/${product._id}`, {
+          method: "POST",
+        });
+        const data = await response.json();
+        if (data.success) {
+          const wishlistIds = (data.data || []).map(item => item._id);
+          setWishlist(wishlistIds);
+        }
+      }
+    } catch (err) {
+      console.error("Error updating wishlist:", err);
+    }
+  };
+
+  const filteredProducts = selectedCategory === "All"
+    ? products
+    : products.filter(p => (p.category || "").toLowerCase().trim() === selectedCategory.toLowerCase().trim());
+
+  // Dynamically generate categories from products
+  const uniqueCategories = ["All", ...new Set(products.map(p => p.category).filter(Boolean))];
+
+  const visibleProducts = filteredProducts.slice(0, displayed);
+  const hasMore = displayed < filteredProducts.length;
+
+  const loadMore = () => {
+    setDisplayed((prev) => Math.min(prev + 4, filteredProducts.length));
+  };
+
+  const handleCategoryChange = (category) => {
+    setSelectedCategory(category);
+    setDisplayed(12);
+  };
+
+  return (
+    <div className="min-h-full bg-gradient-to-b from-slate-50 via-blue-50 to-teal-50">
+      {/* Page Header */}
+      <div className="bg-gradient-to-r from-blue-700 via-teal-600 to-teal-500 text-white py-12 px-4 shadow-lg">
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-4xl font-bold mb-2">All Products</h1>
+          <p className="text-teal-100">Browse our complete collection of premium products</p>
+        </div>
+      </div>
+
+      {/* Category Filter */}
+      <div className="max-w-7xl mx-auto px-6 py-6">
+        <div className="flex flex-wrap justify-center gap-4">
+          {uniqueCategories.map((category) => (
+            <button
+              key={category}
+              onClick={() => handleCategoryChange(category)}
+              className={`px-6 py-2 rounded-full font-semibold transition ${selectedCategory === category
+                  ? "bg-teal-600 text-white"
+                  : "bg-white text-gray-700 hover:bg-gray-100"
+                }`}
+            >
+              {category}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Products Grid */}
+      <main className="max-w-7xl mx-auto p-6">
+        {loading ? (
+          <div className="flex justify-center items-center py-16">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-teal-600"></div>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-16">
+            <p className="text-gray-600 text-xl">No products found in this category.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+              {visibleProducts.map((product) => (
+                <div
+                  key={product._id || product.id}
+                  className="bg-white rounded-2xl shadow-md p-4 hover:shadow-xl transition transform hover:scale-105 cursor-pointer relative"
+                >
+                  <div
+                    onClick={() => onPageChange("ProductDetails", product._id || product.id)}
+                    className="relative overflow-hidden rounded-xl mb-4 cursor-pointer h-56"
+                  >
+                    <img
+                      src={product.image_url || product.image}
+                      alt={product.name}
+                      className="w-full h-full object-cover hover:scale-110 transition-transform duration-500"
+                    />
+                    <div className="absolute top-2 right-2 bg-blue-600 text-white px-2 py-1 rounded text-xs font-semibold">
+                      {product.category}
+                    </div>
+                    {/* Heart Button */}
+                    <button
+                      onClick={(e) => handleToggleWishlist(product, e)}
+                      className={`absolute top-2 left-2 p-2 rounded-full transition ${wishlist.includes(product._id)
+                          ? "bg-teal-500 text-white"
+                          : "bg-white/80 text-gray-600 hover:bg-white"
+                        }`}
+                    >
+                      <Heart
+                        size={18}
+                        className={wishlist.includes(product._id) ? "fill-current" : ""}
+                      />
+                    </button>
+                  </div>
+                  <h2
+                    onClick={() => onPageChange("ProductDetails", product._id || product.id)}
+                    className="text-lg font-semibold text-gray-800 mb-2 cursor-pointer hover:text-blue-600 transition"
+                  >
+                    {product.name}
+                  </h2>
+                  <p className="text-2xl font-bold text-blue-600 mb-3">₹{product.price}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => onPageChange("ProductDetails", product._id || product.id)}
+                      className="bg-gradient-to-r from-blue-500 to-teal-600 text-white py-2 rounded-xl hover:shadow-lg transition font-semibold text-sm"
+                    >
+                      View
+                    </button>
+                    <button
+                      onClick={() => onAddToCart(product)}
+                      className="bg-gray-200 text-gray-800 py-2 rounded-xl hover:bg-gray-300 transition font-semibold text-sm"
+                    >
+                      Add Cart
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Load More Button */}
+            {hasMore && (
+              <div className="flex justify-center">
+                <button
+                  onClick={loadMore}
+                  className="bg-blue-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-blue-700 transition text-lg"
+                >
+                  Load More Products
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
