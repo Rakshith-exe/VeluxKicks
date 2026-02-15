@@ -8,22 +8,58 @@ const mongoose = require("mongoose");
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || "velux_kicks_secret_key_2024";
-const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/ecommerce";
+// Use environment variable or fallback to the MongoDB Atlas URI
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://gowdarakshith4663_db_user:gowdaatlas@velux.ofigioe.mongodb.net/ecommerce?retryWrites=true&w=majority";
 
+// Enable CORS for all origins
 app.use(cors());
 app.use(bodyParser.json());
 
+// Debug logging
+console.log("API Starting...");
+console.log("MongoDB URI:", MONGO_URI ? MONGO_URI.substring(0, 30) + "..." : "not set");
+console.log("Node env:", process.env.NODE_ENV);
+console.log("Vercel env:", process.env.VERCEL);
+
 // MongoDB Connection
 let isConnected = false;
+let dbConnection = null;
 
 async function connectDB() {
-  if (isConnected) return;
+  if (isConnected && dbConnection) {
+    console.log("Using existing DB connection");
+    return dbConnection;
+  }
+  
   try {
-    await mongoose.connect(MONGO_URI);
+    console.log("Connecting to MongoDB...");
+    console.log("MongoDB URI:", MONGO_URI ? MONGO_URI.replace(/:([^:@]+)@/, ":****@") : "not set");
+    
+    await mongoose.connect(MONGO_URI, {
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+    
     isConnected = true;
-    console.log("✅ Connected to MongoDB");
+    dbConnection = mongoose.connection;
+    console.log("✅ Connected to MongoDB Atlas");
+    
+    // Handle connection events
+    mongoose.connection.on('error', (err) => {
+      console.error("MongoDB connection error:", err);
+      isConnected = false;
+    });
+    
+    mongoose.connection.on('disconnected', () => {
+      console.log("MongoDB disconnected");
+      isConnected = false;
+    });
+    
+    return dbConnection;
   } catch (err) {
-    console.error("❌ MongoDB connection error:", err);
+    console.error("❌ MongoDB connection error:", err.message);
+    isConnected = false;
+    throw err;
   }
 }
 
@@ -147,6 +183,11 @@ async function initializeDatabase() {
 // Connect to MongoDB
 connectDB().then(() => initializeDatabase());
 
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
 // ===== PRODUCT ENDPOINTS =====
 
 // GET all products
@@ -265,23 +306,30 @@ app.post("/api/auth/register", async (req, res) => {
 app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
 
+  console.log("Login attempt for:", email);
+
   if (!email || !password) {
     return res.status(400).json({ success: false, message: "Email and password are required" });
   }
 
   try {
     await connectDB();
+    console.log("Connected to DB, looking for user...");
+    
     const user = await User.findOne({ email });
     if (!user) {
+      console.log("User not found:", email);
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
+      console.log("Invalid password for user:", email);
       return res.status(401).json({ success: false, message: "Invalid password" });
     }
 
     const token = generateToken(user);
+    console.log("Login successful for:", email);
 
     res.json({
       success: true,
