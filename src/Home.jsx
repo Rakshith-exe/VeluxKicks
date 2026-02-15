@@ -2,6 +2,28 @@ import React, { useState, useEffect } from "react";
 import Carousel from "./Carousel";
 import API_BASE_URL from "./config";
 
+// Sample products to show when API is unavailable
+const SAMPLE_PRODUCTS = [
+  {
+    _id: "sample1",
+    name: "Premium Running Shoes",
+    category: "Footwear",
+    image_url: "/images/SHOE1.jpg"
+  },
+  {
+    _id: "sample2",
+    name: "Classic Leather Sneakers",
+    category: "Footwear",
+    image_url: "/images/WhatsApp Image 2026-01-13 at 7.57.38 PM.jpeg"
+  },
+  {
+    _id: "sample3",
+    name: "Urban Style Collection",
+    category: "Fashion",
+    image_url: "/images/WhatsApp Image 2026-01-13 at 7.57.39 PM.jpeg"
+  }
+];
+
 export default function Home({ cart, onAddToCart, onPageChange }) {
   const [highlightProducts, setHighlightProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,12 +33,17 @@ export default function Home({ cart, onAddToCart, onPageChange }) {
       try {
         const response = await fetch(`${API_BASE_URL}/products`);
         const data = await response.json();
-        if (data.success && data.data) {
+        if (data.success && data.data && data.data.length > 0) {
           // Get first 3 products for highlights
           setHighlightProducts(data.data.slice(0, 3));
+        } else {
+          // Use sample products if API returns empty
+          setHighlightProducts(SAMPLE_PRODUCTS);
         }
       } catch (err) {
         console.error("Error fetching products:", err);
+        // Use sample products on error
+        setHighlightProducts(SAMPLE_PRODUCTS);
       } finally {
         setLoading(false);
       }
