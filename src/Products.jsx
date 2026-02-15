@@ -7,9 +7,8 @@ export default function Products({ onAddToCart, onPageChange }) {
   const [displayed, setDisplayed] = useState(12);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [products, setProducts] = useState(productsData); // Load static data immediately
-  const [loading, setLoading] = useState(false); // Start with false for instant display
   const [wishlist, setWishlist] = useState([]);
-  const [dataSource, setDataSource] = useState('static'); // Track where data came from
+  const loading = false; // Static data loads instantly, no loading state needed
 
   useEffect(() => {
     fetchProducts();
@@ -29,7 +28,6 @@ export default function Products({ onAddToCart, onPageChange }) {
       const data = await response.json();
       if (data.success && data.data && data.data.length > 0) {
         setProducts(data.data);
-        setDataSource('api');
       }
       // If API fails or returns empty, keep using static data
     } catch (err) {
