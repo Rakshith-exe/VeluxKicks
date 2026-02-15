@@ -14,7 +14,11 @@ const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/ecommerce"
 // ===== MONGODB CONNECTION =====
 console.log("MongoDB URI:", MONGO_URI);
 mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ Connected to MongoDB"))
+  .then(async () => {
+    console.log("✅ Connected to MongoDB");
+    // Initialize/Seed database (ensures production is populated)
+    await initializeDatabase();
+  })
   .catch(err => console.error("❌ MongoDB connection error:", err));
 
 // ===== MONGOOSE MODELS =====
@@ -86,14 +90,14 @@ async function generateOrderId() {
   const timestamp = Date.now().toString(36).toUpperCase();
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   const orderId = `${prefix}${timestamp}-${random}`;
-  
+
   // Check if order_id already exists
   const existing = await Order.findOne({ order_id: orderId });
   if (existing) {
     // Generate again if duplicate (very rare)
     return generateOrderId();
   }
-  
+
   return orderId;
 }
 
@@ -108,7 +112,7 @@ app.use('/images', express.static('public/images'));
 // ===== DATABASE SEEDING =====
 async function initializeDatabase() {
   const productCount = await Product.countDocuments();
-  
+
   // Image mapping for 12 products (9 unique images, some reused)
   const imageUrls = [
     "/images/SHOE1.jpg",
@@ -124,7 +128,7 @@ async function initializeDatabase() {
     "/images/Screenshot 2026-02-04 123222.png",
     "/images/Screenshot 2026-02-04 123246.png"
   ];
-  
+
   const productData = [
     { name: "Air Max Pro Runner", price: 55000, category: "Running Sneakers", stock: 50, description: "High performance running shoe with max cushioning." },
     { name: "Classic White Sneakers", price: 2500, category: "Casual Sneakers", stock: 100, description: "Clean white sneakers for everyday wear." },
@@ -139,7 +143,7 @@ async function initializeDatabase() {
     { name: "Street Canvas", price: 3500, category: "Casual Sneakers", stock: 70, description: "Retro style and comfortable." },
     { name: "Exclusive Edition", price: 9500, category: "Premium Sneakers", stock: 25, description: "Elegant and durable." }
   ];
-  
+
   if (productCount === 0) {
     const productsToCreate = productData.map((product, index) => ({
       ...product,
@@ -221,7 +225,7 @@ app.post("/api/products/sync", async (req, res) => {
   try {
     // Delete all existing products
     await Product.deleteMany({});
-    
+
     // Image mapping for 12 products
     const imageUrls = [
       "/images/SHOE1.jpg",
@@ -237,7 +241,7 @@ app.post("/api/products/sync", async (req, res) => {
       "/images/Screenshot 2026-02-04 123222.png",
       "/images/Screenshot 2026-02-04 123246.png"
     ];
-    
+
     const productData = [
       { name: "Air Max Pro Runner", price: 55000, category: "Running Sneakers", stock: 50, description: "High performance running shoe with max cushioning." },
       { name: "Classic White Sneakers", price: 2500, category: "Casual Sneakers", stock: 100, description: "Clean white sneakers for everyday wear." },
@@ -252,14 +256,14 @@ app.post("/api/products/sync", async (req, res) => {
       { name: "Street Canvas", price: 3500, category: "Casual Sneakers", stock: 70, description: "Retro style and comfortable." },
       { name: "Exclusive Edition", price: 9500, category: "Premium Sneakers", stock: 25, description: "Elegant and durable." }
     ];
-    
+
     const productsToCreate = productData.map((product, index) => ({
       ...product,
       image_url: imageUrls[index]
     }));
-    
+
     await Product.create(productsToCreate);
-    
+
     res.json({
       success: true,
       message: "Synced 12 products successfully",
@@ -411,7 +415,7 @@ app.post("/api/orders", async (req, res) => {
 
     // Generate unique order ID
     const orderId = await generateOrderId();
-    
+
     const estimatedDelivery = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
     const order = await Order.create({
       order_id: orderId,
@@ -644,7 +648,7 @@ app.get("/api/auth/verify", async (req, res) => {
 // Update user profile
 app.put("/api/auth/profile", async (req, res) => {
   const authHeader = req.headers.authorization;
-  
+
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
     return res.status(401).json({ success: false, message: "No token provided" });
   }
@@ -654,7 +658,7 @@ app.put("/api/auth/profile", async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    
+
     await User.findByIdAndUpdate(decoded.id, {
       name,
       phone,
@@ -912,7 +916,7 @@ app.delete("/api/admin/products/:id", async (req, res) => {
 app.get("/api/admin/orders", async (req, res) => {
   try {
     const orders = await Order.find().sort({ created_at: -1 });
-    
+
     res.json({
       success: true,
       data: orders.map(toPlainObj),
@@ -1001,10 +1005,10 @@ app.get("/api/admin/stats", async (req, res) => {
     const totalProducts = await Product.countDocuments();
     const totalOrders = await Order.countDocuments();
     const totalUsers = await User.countDocuments();
-    
+
     const allOrders = await Order.find();
     const totalRevenue = allOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-    
+
     const pendingOrders = allOrders.filter(o => o.status === "Pending").length;
     const completedOrders = allOrders.filter(o => o.status === "Delivered").length;
 
@@ -1051,9 +1055,6 @@ if (process.env.VERCEL === undefined) {
     console.log(`\n✅ Server running on http://localhost:${PORT}`);
     console.log(`📦 Database: MongoDB`);
     console.log(`🔐 JWT Secret: ${JWT_SECRET.substring(0, 8)}...`);
-    
-    // Initialize database (seed products if empty)
-    await initializeDatabase();
   });
 }
 
