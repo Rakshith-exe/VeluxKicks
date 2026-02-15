@@ -6,9 +6,10 @@ import API_BASE_URL from "./config";
 export default function Products({ onAddToCart, onPageChange }) {
   const [displayed, setDisplayed] = useState(12);
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState(productsData); // Load static data immediately
+  const [loading, setLoading] = useState(false); // Start with false for instant display
   const [wishlist, setWishlist] = useState([]);
+  const [dataSource, setDataSource] = useState('static'); // Track where data came from
 
   useEffect(() => {
     fetchProducts();
@@ -18,7 +19,7 @@ export default function Products({ onAddToCart, onPageChange }) {
   const fetchProducts = async () => {
     // Create an AbortController for timeout
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
     
     try {
       const response = await fetch(`${API_BASE_URL}/products`, {
@@ -28,17 +29,13 @@ export default function Products({ onAddToCart, onPageChange }) {
       const data = await response.json();
       if (data.success && data.data && data.data.length > 0) {
         setProducts(data.data);
-      } else {
-        // Fallback to static data if API returns empty or no products
-        setProducts(productsData);
+        setDataSource('api');
       }
+      // If API fails or returns empty, keep using static data
     } catch (err) {
       clearTimeout(timeoutId);
       console.error("Error fetching products:", err);
-      // Fallback to static data if API fails
-      setProducts(productsData);
-    } finally {
-      setLoading(false);
+      // Keep using static data from initial state
     }
   };
 
