@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Plus, Minus, ShoppingCart, CreditCard, Heart } from "lucide-react";
 import API_BASE_URL from "./config";
+import { productsData } from "./productsData";
 
 export default function ProductDetails({ productId, onPageChange, onAddToCart }) {
   const [product, setProduct] = useState(null);
@@ -20,9 +21,26 @@ export default function ProductDetails({ productId, onPageChange, onAddToCart })
         const data = await response.json();
         if (data.success) {
           setProduct(data.data);
+        } else {
+          // API returned no product, try static data fallback
+          const staticProduct = productsData.find(
+            p => (p._id === productId) || (p.id === productId) || (String(p.id) === String(productId))
+          );
+          if (staticProduct) {
+            setProduct(staticProduct);
+          }
         }
       } catch (error) {
         console.error('Error fetching product:', error);
+        // Try to find in static data on error
+        const staticProduct = productsData.find(
+          p => (p._id === productId) || (p.id === productId) || (String(p.id) === String(productId))
+        );
+        if (staticProduct) {
+          setProduct(staticProduct);
+        }
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -58,7 +76,6 @@ export default function ProductDetails({ productId, onPageChange, onAddToCart })
       fetchProduct();
       fetchReviews();
       fetchWishlist();
-      setLoading(false);
     }
   }, [productId]);
 

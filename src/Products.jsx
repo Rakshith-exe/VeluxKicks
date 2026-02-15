@@ -16,8 +16,15 @@ export default function Products({ onAddToCart, onPageChange }) {
   }, []);
 
   const fetchProducts = async () => {
+    // Create an AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/products`);
+      const response = await fetch(`${API_BASE_URL}/products`, {
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
       const data = await response.json();
       if (data.success && data.data && data.data.length > 0) {
         setProducts(data.data);
@@ -26,6 +33,7 @@ export default function Products({ onAddToCart, onPageChange }) {
         setProducts(productsData);
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       console.error("Error fetching products:", err);
       // Fallback to static data if API fails
       setProducts(productsData);
